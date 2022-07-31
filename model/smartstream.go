@@ -86,3 +86,19 @@ type SnapQuote struct {
 	YearlyHighPrice             int64
 	YearlyLowPrice              int64
 }
+
+type SubscriptionRequest struct {
+	CorrelationID string            `json:"correlationID"`
+	Action        int8              `json:"action"`
+	Params        SubscriptionParam `json:"params"`
+}
+
+type SubscriptionParam struct {
+	Mode      SmartStreamSubsMode  `json:"mode"`
+	TokenList []SubscriptionTokens `json:"tokenList"`
+}
+
+type SubscriptionTokens struct {
+	ExchangeType ExchangeType `json:"exchangeType"`
+	Tokens       []string     `json:"tokens"`
+}

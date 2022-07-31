@@ -3,9 +3,11 @@ package smartstream
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"github.com/angelbroking-github/smartapigo/model"
 	"github.com/gorilla/websocket"
+	"log"
 	"math"
 	"net/http"
 	"net/url"
@@ -17,7 +19,7 @@ type WebSocket struct {
 	clientID            string
 	feedToken           string
 	callbacks           Callbacks
-	SubsMap             map[model.SmartStreamSubsMode][]*model.TokenID
+	subsMap             map[model.SmartStreamSubsMode][]model.TokenID
 	Conn                *websocket.Conn
 	url                 url.URL
 	autoReconnect       bool
@@ -26,6 +28,9 @@ type WebSocket struct {
 	connectTimeout      time.Duration
 	reconnectAttempt    int
 	cancel              context.CancelFunc
+	lastPongTime        time.Time
+	subroutineContext   context.Context
+	subroutineCancel    context.CancelFunc
 }
 
 //MessageHandler Handler interface for handling messages received over smartstream websocket
@@ -59,6 +64,11 @@ const (
 	// Interval in which the connection check is performed periodically.
 	connectionCheckInterval time.Duration = 10000 * time.Millisecond
 
+	writeWait          = 5 * time.Second
+	pingPeriod         = 10 * time.Second
+	idleTimeout        = 15 * time.Second
+	sessionCheckPeriod = 5 * time.Second
+
 	//Headers for connection
 	clientIDHeader  = "x-client-code"
 	feedTokenHeader = "x-feed-token"
@@ -75,7 +85,7 @@ func New(clientID string, feedToken string) *WebSocket {
 		reconnectMaxDelay:   defaultReconnectMaxDelay,
 		reconnectMaxRetries: defaultReconnectMaxAttempts,
 		connectTimeout:      defaultConnectTimeout,
-		SubsMap:             make(map[model.SmartStreamSubsMode][]*model.TokenID),
+		subsMap:             make(map[model.SmartStreamSubsMode][]model.TokenID),
 	}
 
 	return ws
@@ -124,9 +134,7 @@ func (ws *WebSocket) ConnectWithContext(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	ws.cancel = cancel
 	defer func() {
-		if ws.Conn != nil {
-			ws.Conn.Close()
-		}
+		ws.Stop()
 	}()
 	for {
 		select {
@@ -143,7 +151,7 @@ func (ws *WebSocket) ConnectWithContext(ctx context.Context) error {
 				}
 
 				ws.onReconnect(ws.reconnectAttempt, nextDelay)
-
+				log.Printf("attempting reconnect in %f seconds", nextDelay.Seconds())
 				time.Sleep(nextDelay)
 
 				if ws.Conn != nil { // Closing previous connection
@@ -162,20 +170,17 @@ func (ws *WebSocket) ConnectWithContext(ctx context.Context) error {
 				return err
 			}
 			ws.onConnected()
-
-			if ws.reconnectAttempt > 0 {
-				err = ws.resubscribe()
-				if err != nil {
-					return err
-				}
-				ws.reconnectAttempt = 0
-			}
+			ws.subroutineContext, ws.subroutineCancel = context.WithCancel(context.Background())
+			go ws.startPing()
 
 			var wg sync.WaitGroup
 
 			// Receive stream data
 			wg.Add(1)
-			go ws.readMessage(ctx, &wg)
+			go ws.readMessage(&wg)
+
+			wg.Add(1)
+			go ws.checkIdleConnection(&wg)
 
 			wg.Wait()
 
@@ -197,8 +202,17 @@ func (ws *WebSocket) onReconnect(attempt int, delay time.Duration) {
 }
 
 func (ws *WebSocket) onConnected() {
-	if ws.callbacks.onConnected != nil {
-		ws.callbacks.onConnected()
+
+	if ws.reconnectAttempt > 0 {
+		err := ws.resubscribe()
+		if err != nil {
+			return
+		}
+		ws.reconnectAttempt = 0
+	} else {
+		if ws.callbacks.onConnected != nil {
+			ws.callbacks.onConnected()
+		}
 	}
 }
 
@@ -208,24 +222,62 @@ func (ws *WebSocket) onError(err error) {
 	}
 }
 
-func (ws *WebSocket) resubscribe() error {
-	return nil
+func (ws *WebSocket) resubscribe() (err error) {
+	for k, v := range ws.subsMap {
+		err = ws.subscribeToTokens(k, v)
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+
+func (ws *WebSocket) Subscribe(mode model.SmartStreamSubsMode, tokenIds []model.TokenID) error {
+	err := ws.subscribeToTokens(mode, tokenIds)
+	if err == nil {
+		if _, ok := ws.subsMap[mode]; !ok {
+			ws.subsMap[mode] = make([]model.TokenID, 0)
+		}
+		ws.subsMap[mode] = append(ws.subsMap[mode], tokenIds...)
+	}
+	return err
+}
+
+func (ws *WebSocket) subscribeToTokens(mode model.SmartStreamSubsMode, tokenIds []model.TokenID) error {
+	request, err := ws.createSubsRequest(mode, tokenIds)
+	if err != nil {
+		return err
+	}
+	err = ws.Conn.WriteMessage(websocket.TextMessage, request)
+	return err
 }
 
 func (ws *WebSocket) onClose(code int, text string) error {
+	fmt.Printf("connection closed ")
 	if ws.callbacks.onClose != nil {
 		ws.callbacks.onClose(code, text)
 	}
 	return nil
 }
 
-func (ws *WebSocket) onPing(appData string) error {
-	fmt.Printf("ping received " + appData)
-	return nil
+func (ws *WebSocket) Stop() {
+	ws.closeRoutines()
+	if ws.cancel != nil {
+		ws.cancel()
+	}
+}
+
+func (ws *WebSocket) closeRoutines() {
+	if ws.subroutineCancel != nil {
+		ws.subroutineCancel()
+		if ws.Conn != nil {
+			ws.Conn.Close()
+		}
+	}
 }
 
 func (ws *WebSocket) onPong(appData string) error {
-	fmt.Printf("pong received " + appData)
+	ws.lastPongTime = time.Now()
 	return nil
 }
 
@@ -250,9 +302,7 @@ func (ws *WebSocket) createConnection() error {
 	if err != nil {
 		return err
 	}
-	conn.SetReadDeadline(time.Now().Add(20))
 	conn.SetCloseHandler(ws.onClose)
-	conn.SetPingHandler(ws.onPing)
 	conn.SetPongHandler(ws.onPong)
 	ws.Conn = conn
 
@@ -260,27 +310,92 @@ func (ws *WebSocket) createConnection() error {
 
 }
 
-func (ws *WebSocket) readMessage(ctx context.Context, wg *sync.WaitGroup) {
+func (ws *WebSocket) readMessage(wg *sync.WaitGroup) {
+	id := time.Now().UnixMilli()
 	defer wg.Done()
 	for {
 		select {
-		case <-ctx.Done():
+		case <-ws.subroutineContext.Done():
 			return
 		default:
 			mType, msg, err := ws.Conn.ReadMessage()
 			if err != nil {
-				ws.onError(fmt.Errorf("Error reading data: %v", err))
+				ws.onError(fmt.Errorf("Error reading data: %d %v", id, err))
 				return
 			}
 
 			//Parsing binary data
-
 			if mType == websocket.BinaryMessage {
-				fmt.Printf("message received")
+				log.Printf("binary message received %d", id)
 
 			} else if mType == websocket.TextMessage {
+				log.Printf("text message received %d", id)
 				ws.onTextMessage(msg)
 			}
 		}
 	}
+}
+
+func (ws *WebSocket) startPing() {
+	ticker := time.NewTicker(pingPeriod)
+	defer func() {
+		ticker.Stop()
+	}()
+	for {
+		select {
+		case <-ws.subroutineContext.Done():
+			return
+		case <-ticker.C:
+			ws.Conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := ws.Conn.WriteMessage(websocket.PingMessage, []byte("ping")); err != nil {
+				return
+			}
+		}
+	}
+}
+
+func (ws *WebSocket) checkIdleConnection(wg *sync.WaitGroup) {
+	defer wg.Done()
+	time.Sleep(pingPeriod * 2)
+	ticker := time.NewTicker(sessionCheckPeriod)
+	defer func() {
+		ticker.Stop()
+	}()
+	for {
+		select {
+		case <-ticker.C:
+			if time.Since(ws.lastPongTime).Seconds() > idleTimeout.Seconds() {
+				log.Printf("ping not received. Reconnecting ...")
+				ws.closeRoutines()
+				ws.reconnectAttempt++
+				return
+			}
+		}
+	}
+}
+
+func (ws *WebSocket) createSubsRequest(mode model.SmartStreamSubsMode, tokenIds []model.TokenID) ([]byte, error) {
+
+	exchangeTokenMap := make(map[model.ExchangeType][]string)
+	for _, val := range tokenIds {
+		if _, ok := exchangeTokenMap[val.ExchangeType]; !ok {
+			exchangeTokenMap[val.ExchangeType] = make([]string, 0)
+		}
+		exchangeTokenMap[val.ExchangeType] = append(exchangeTokenMap[val.ExchangeType], val.Token)
+	}
+
+	tokenList := make([]model.SubscriptionTokens, 0)
+	for k, v := range exchangeTokenMap {
+		subscriptionTokens := model.SubscriptionTokens{ExchangeType: k, Tokens: v}
+		tokenList = append(tokenList, subscriptionTokens)
+	}
+	params := model.SubscriptionParam{Mode: mode, TokenList: tokenList}
+
+	subscriptionRequest := model.SubscriptionRequest{}
+	subscriptionRequest.Action = 1
+	subscriptionRequest.Params = params
+	subscriptionRequest.CorrelationID = "abc"
+
+	return json.Marshal(subscriptionRequest)
+
 }
