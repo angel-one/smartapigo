@@ -19,7 +19,7 @@ import (
 type WebSocket struct {
 	clientID            string
 	feedToken           string
-	callbacks           Callbacks
+	callbacks           callbacks
 	subsMap             map[model.SmartStreamSubsMode][]model.TokenInfo
 	Conn                *websocket.Conn
 	url                 url.URL
@@ -35,7 +35,7 @@ type WebSocket struct {
 }
 
 //MessageHandler Handler interface for handling messages received over smartstream websocket
-type Callbacks struct {
+type callbacks struct {
 	onLTP             func(ltpInfo model.LTPInfo)
 	onQuote           func(quote model.Quote)
 	onSnapquote       func(quote model.SnapQuote)
@@ -125,6 +125,36 @@ func (ws *WebSocket) SetReconnectMaxDelay(val time.Duration) error {
 // SetReconnectMaxRetries sets maximum reconnect attempts.
 func (ws *WebSocket) SetReconnectMaxRetries(val int) {
 	ws.reconnectMaxRetries = val
+}
+
+func (ws *WebSocket) SetOnConnected(fn func()) {
+	if fn != nil {
+		ws.callbacks.onConnected = fn
+	}
+}
+
+func (ws *WebSocket) SetOnSnapquote(fn func(model.SnapQuote)) {
+	if fn != nil {
+		ws.callbacks.onSnapquote = fn
+	}
+}
+
+func (ws *WebSocket) SetOnLTP(fn func(info model.LTPInfo)) {
+	if fn != nil {
+		ws.callbacks.onLTP = fn
+	}
+}
+
+func (ws *WebSocket) SetOnQuote(fn func(quote model.Quote)) {
+	if fn != nil {
+		ws.callbacks.onQuote = fn
+	}
+}
+
+func (ws *WebSocket) SetOnClose(fn func(int, string)) {
+	if fn != nil {
+		ws.callbacks.onClose = fn
+	}
 }
 
 func (ws *WebSocket) Connect() error {
