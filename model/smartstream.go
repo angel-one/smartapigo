@@ -27,64 +27,64 @@ const (
 	SNAPQUOTE SmartStreamSubsMode = 3
 )
 
-type TokenID struct {
+type TokenInfo struct {
 	ExchangeType ExchangeType
 	Token        string
 }
 
 type SmartApiBBSInfo struct {
-	SiBbBuySellFlag  int16
-	lQuantity        int64
-	lPrice           int64
-	SiNumberOfOrders int16
+	Flag           uint16
+	Quantity       uint64
+	Price          uint64
+	NumberOfOrders uint16
 }
 
 type LTPInfo struct {
-	TokenID                     TokenID
-	SequenceNumber              int64
-	ExchangeFeedTimeEpochMillis int64
-	LastTradedPrice             int64
+	TokenInfo                   TokenInfo
+	SequenceNumber              uint64
+	ExchangeFeedTimeEpochMillis uint64
+	LastTradedPrice             uint64
 }
 
 type Quote struct {
-	TokenID                     TokenID
-	SequenceNumber              int64
-	ExchangeFeedTimeEpochMillis int64
-	LastTradedPrice             int64
-	LastTradedQty               int64
-	AvgTradedPrice              int64
-	VolumeTradedToday           int64
+	TokenInfo                   TokenInfo
+	SequenceNumber              uint64
+	ExchangeFeedTimeEpochMillis uint64
+	LastTradedPrice             uint64
+	LastTradedQty               uint64
+	AvgTradedPrice              uint64
+	VolumeTradedToday           uint64
 	TotalBuyQty                 float64
 	TotalSellQty                float64
-	OpenPrice                   int64
-	HighPrice                   int64
-	LowPrice                    int64
-	ClosePrice                  int64
+	OpenPrice                   uint64
+	HighPrice                   uint64
+	LowPrice                    uint64
+	ClosePrice                  uint64
 }
 
 type SnapQuote struct {
-	TokenID                     TokenID
-	SequenceNumber              int64
-	ExchangeFeedTimeEpochMillis int64
-	LastTradedPrice             int64
-	LastTradedQty               int64
-	AvgTradedPrice              int64
-	VolumeTradedToday           int64
+	TokenInfo                   TokenInfo
+	SequenceNumber              uint64
+	ExchangeFeedTimeEpochMillis uint64
+	LastTradedPrice             uint64
+	LastTradedQty               uint64
+	AvgTradedPrice              uint64
+	VolumeTradedToday           uint64
 	TotalBuyQty                 float64
 	TotalSellQty                float64
-	OpenPrice                   int64
-	HighPrice                   int64
-	LowPrice                    int64
-	ClosePrice                  int64
-	LastTradedTimestamp         int64
-	OpenInterest                int64
+	OpenPrice                   uint64
+	HighPrice                   uint64
+	LowPrice                    uint64
+	ClosePrice                  uint64
+	LastTradedTimestamp         uint64
+	OpenInterest                uint64
 	OpenInterestChangePerc      float64
-	BestFiveBuy                 []*SmartApiBBSInfo
-	BestFiveSell                []*SmartApiBBSInfo
-	UpperCircuit                int64
-	LowerCircuit                int64
-	YearlyHighPrice             int64
-	YearlyLowPrice              int64
+	BestFiveBuy                 []SmartApiBBSInfo
+	BestFiveSell                []SmartApiBBSInfo
+	UpperCircuit                uint64
+	LowerCircuit                uint64
+	YearlyHighPrice             uint64
+	YearlyLowPrice              uint64
 }
 
 type SubscriptionRequest struct {

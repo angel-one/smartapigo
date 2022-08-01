@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/angelbroking-github/smartapigo/model"
+	"github.com/angelbroking-github/smartapigo/smartstream/internal/parser"
 	"github.com/gorilla/websocket"
 	"log"
 	"math"
@@ -19,7 +20,7 @@ type WebSocket struct {
 	clientID            string
 	feedToken           string
 	callbacks           Callbacks
-	subsMap             map[model.SmartStreamSubsMode][]model.TokenID
+	subsMap             map[model.SmartStreamSubsMode][]model.TokenInfo
 	Conn                *websocket.Conn
 	url                 url.URL
 	autoReconnect       bool
@@ -85,7 +86,7 @@ func New(clientID string, feedToken string) *WebSocket {
 		reconnectMaxDelay:   defaultReconnectMaxDelay,
 		reconnectMaxRetries: defaultReconnectMaxAttempts,
 		connectTimeout:      defaultConnectTimeout,
-		subsMap:             make(map[model.SmartStreamSubsMode][]model.TokenID),
+		subsMap:             make(map[model.SmartStreamSubsMode][]model.TokenInfo),
 	}
 
 	return ws
@@ -232,18 +233,18 @@ func (ws *WebSocket) resubscribe() (err error) {
 	return
 }
 
-func (ws *WebSocket) Subscribe(mode model.SmartStreamSubsMode, tokenIds []model.TokenID) error {
+func (ws *WebSocket) Subscribe(mode model.SmartStreamSubsMode, tokenIds []model.TokenInfo) error {
 	err := ws.subscribeToTokens(mode, tokenIds)
 	if err == nil {
 		if _, ok := ws.subsMap[mode]; !ok {
-			ws.subsMap[mode] = make([]model.TokenID, 0)
+			ws.subsMap[mode] = make([]model.TokenInfo, 0)
 		}
 		ws.subsMap[mode] = append(ws.subsMap[mode], tokenIds...)
 	}
 	return err
 }
 
-func (ws *WebSocket) subscribeToTokens(mode model.SmartStreamSubsMode, tokenIds []model.TokenID) error {
+func (ws *WebSocket) subscribeToTokens(mode model.SmartStreamSubsMode, tokenIds []model.TokenInfo) error {
 	request, err := ws.createSubsRequest(mode, tokenIds)
 	if err != nil {
 		return err
@@ -311,7 +312,6 @@ func (ws *WebSocket) createConnection() error {
 }
 
 func (ws *WebSocket) readMessage(wg *sync.WaitGroup) {
-	id := time.Now().UnixMilli()
 	defer wg.Done()
 	for {
 		select {
@@ -320,16 +320,29 @@ func (ws *WebSocket) readMessage(wg *sync.WaitGroup) {
 		default:
 			mType, msg, err := ws.Conn.ReadMessage()
 			if err != nil {
-				ws.onError(fmt.Errorf("Error reading data: %d %v", id, err))
+				ws.onError(fmt.Errorf("Error reading data: %v", err))
 				return
 			}
 
 			//Parsing binary data
 			if mType == websocket.BinaryMessage {
-				log.Printf("binary message received %d", id)
+				mode := model.SmartStreamSubsMode(msg[0])
+
+				switch mode {
+				case model.LTP:
+					ltp := parser.ParseLTP(msg)
+					ws.callbacks.onLTP(ltp)
+				case model.QUOTE:
+					quote := parser.ParseQuote(msg)
+					ws.callbacks.onQuote(quote)
+				case model.SNAPQUOTE:
+					snapquote := parser.ParseSnapquote(msg)
+					ws.callbacks.onSnapquote(snapquote)
+				default:
+					log.Printf("Message mode not  recognized")
+				}
 
 			} else if mType == websocket.TextMessage {
-				log.Printf("text message received %d", id)
 				ws.onTextMessage(msg)
 			}
 		}
@@ -374,7 +387,7 @@ func (ws *WebSocket) checkIdleConnection(wg *sync.WaitGroup) {
 	}
 }
 
-func (ws *WebSocket) createSubsRequest(mode model.SmartStreamSubsMode, tokenIds []model.TokenID) ([]byte, error) {
+func (ws *WebSocket) createSubsRequest(mode model.SmartStreamSubsMode, tokenIds []model.TokenInfo) ([]byte, error) {
 
 	exchangeTokenMap := make(map[model.ExchangeType][]string)
 	for _, val := range tokenIds {
