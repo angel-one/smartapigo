@@ -3,6 +3,7 @@ package parser
 import (
 	"encoding/binary"
 	"github.com/ajha1991/smartapigo/model"
+	"math"
 )
 
 func ParseLTP(msg []byte) model.LTPInfo {
@@ -26,8 +27,8 @@ func ParseQuote(msg []byte) model.Quote {
 	quote.LastTradedQty = binary.LittleEndian.Uint64(msg[51:59])
 	quote.AvgTradedPrice = binary.LittleEndian.Uint64(msg[59:67])
 	quote.VolumeTradedToday = binary.LittleEndian.Uint64(msg[67:75])
-	quote.TotalBuyQty = float64(binary.LittleEndian.Uint64(msg[75:83]))
-	quote.TotalSellQty = float64(binary.LittleEndian.Uint64(msg[83:91]))
+	quote.TotalBuyQty = math.Float64frombits(binary.LittleEndian.Uint64(msg[75:83]))
+	quote.TotalSellQty = math.Float64frombits(binary.LittleEndian.Uint64(msg[83:91]))
 	quote.OpenPrice = binary.LittleEndian.Uint64(msg[91:99])
 	quote.HighPrice = binary.LittleEndian.Uint64(msg[99:107])
 	quote.LowPrice = binary.LittleEndian.Uint64(msg[107:115])
@@ -54,7 +55,7 @@ func ParseSnapquote(msg []byte) model.SnapQuote {
 
 	snapquote.LastTradedTimestamp = binary.LittleEndian.Uint64(msg[123:131])
 	snapquote.OpenInterest = binary.LittleEndian.Uint64(msg[131:139])
-	snapquote.OpenInterestChangePerc = float64(binary.LittleEndian.Uint64(msg[139:147]))
+	snapquote.OpenInterestChangePerc = math.Float64frombits(binary.LittleEndian.Uint64(msg[139:147]))
 
 	snapquote.BestFiveBuy, snapquote.BestFiveSell = getBestBuySellData(msg[147:347])
 
