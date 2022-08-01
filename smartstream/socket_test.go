@@ -1,7 +1,7 @@
 package smartstream
 
 import (
-	"github.com/angelbroking-github/smartapigo/model"
+	"github.com/ajha1991/smartapigo/model"
 	"log"
 	"testing"
 )

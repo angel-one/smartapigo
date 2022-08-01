@@ -2,7 +2,7 @@ package parser
 
 import (
 	"encoding/binary"
-	"github.com/angelbroking-github/smartapigo/model"
+	"github.com/ajha1991/smartapigo/model"
 )
 
 func ParseLTP(msg []byte) model.LTPInfo {
