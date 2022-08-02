@@ -151,6 +151,24 @@ func (ws *WebSocket) SetOnQuote(fn func(quote model.Quote)) {
 	}
 }
 
+func (ws *WebSocket) SetOnError(fn func(err error)) {
+	if fn != nil {
+		ws.callbacks.onError = fn
+	}
+}
+
+func (ws *WebSocket) SetOnReconnect(fn func(attempt int, nextDelay time.Duration)) {
+	if fn != nil {
+		ws.callbacks.onReconnect = fn
+	}
+}
+
+func (ws *WebSocket) SetOnReconnectFailed(fn func(attempt int)) {
+	if fn != nil {
+		ws.callbacks.onReconnectFailed = fn
+	}
+}
+
 func (ws *WebSocket) SetOnClose(fn func(int, string)) {
 	if fn != nil {
 		ws.callbacks.onClose = fn
