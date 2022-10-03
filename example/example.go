@@ -2,15 +2,16 @@ package main
 
 import (
 	"fmt"
+
 	SmartApi "github.com/angelbroking-github/smartapigo"
 )
 
 func main() {
 
 	// Create New Angel Broking Client
-	ABClient := SmartApi.New("Your Client Code", "Your Password","Your api key")
+	ABClient := SmartApi.New("Your Client Code", "Your Password", "Your api key", " TOTP")
 
-	fmt.Println("Client :- ",ABClient)
+	fmt.Println("Client :- ", ABClient)
 
 	// User Login and Generate User Session
 	session, err := ABClient.GenerateSession()
@@ -52,7 +53,7 @@ func main() {
 	fmt.Println("Placed Order ID and Script :- ", order)
 
 	//Modify Order
-	modifiedOrder, err := ABClient.ModifyOrder(SmartApi.ModifyOrderParams{Variety: "NORMAL", OrderID: order.OrderID, OrderType: "LIMIT", ProductType: "INTRADAY", Duration: "DAY", Price: "19400", Quantity: "1",TradingSymbol: "SBI-EQ",SymbolToken: "3045",Exchange: "NSE"})
+	modifiedOrder, err := ABClient.ModifyOrder(SmartApi.ModifyOrderParams{Variety: "NORMAL", OrderID: order.OrderID, OrderType: "LIMIT", ProductType: "INTRADAY", Duration: "DAY", Price: "19400", Quantity: "1", TradingSymbol: "SBI-EQ", SymbolToken: "3045", Exchange: "NSE"})
 
 	if err != nil {
 		fmt.Println(err.Error())
@@ -122,7 +123,7 @@ func main() {
 	fmt.Println("Risk Managemanet System :- ", rms)
 
 	//Position Conversion
-	err = ABClient.ConvertPosition(SmartApi.ConvertPositionParams{"NSE","SBIN-EQ","INTRADAY","MARGIN","BUY",1,"DAY"})
+	err = ABClient.ConvertPosition(SmartApi.ConvertPositionParams{Exchange: "NSE", TradingSymbol: "SBIN-EQ", OldProductType: "INTRADAY", NewProductType: "MARGIN", TransactionType: "BUY", Quantity: 1, Type: "DAY"})
 	if err != nil {
 		fmt.Println(err.Error())
 		return

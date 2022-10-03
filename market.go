@@ -7,11 +7,11 @@ type LTPResponse struct {
 	Exchange      string  `json:"exchange"`
 	TradingSymbol string  `json:"tradingsymbol"`
 	SymbolToken   string  `json:"symboltoken"`
-	Open          float64 `json:"open"`
-	High          float64 `json:"high"`
-	Low           float64 `json:"low"`
-	Close         float64 `json:"close"`
-	Ltp           float64 `json:"ltp"`
+	Open          float64 `json:"open,string"`
+	High          float64 `json:"high,string"`
+	Low           float64 `json:"low,string"`
+	Close         float64 `json:"close,string"`
+	Ltp           float64 `json:"ltp,string"`
 }
 
 // LTPParams represents parameters for getting LTP.
