@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+
 	SmartApi "github.com/ajha1991/smartapigo"
 )
 
@@ -13,7 +14,7 @@ func main() {
 	fmt.Println("Client :- ", ABClient)
 
 	// User Login and Generate User Session
-	session, err := ABClient.GenerateSession()
+	session, err := ABClient.GenerateSession("your totp here")
 
 	if err != nil {
 		fmt.Println(err.Error())
