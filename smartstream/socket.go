@@ -219,6 +219,17 @@ func (ws *WebSocket) ConnectWithContext(ctx context.Context) error {
 				return err
 			}
 			ws.onConnected()
+
+			if ws.reconnectAttempt > 0 {
+				err = ws.resubscribe()
+				if err != nil {
+					log.Printf("error while resubscribing ")
+					ws.onError(err)
+				}
+			}
+
+			ws.reconnectAttempt = 0 // setting reconnect attempt again to 0
+
 			ws.subroutineContext, ws.subroutineCancel = context.WithCancel(context.Background())
 			go ws.startPing()
 
@@ -251,17 +262,8 @@ func (ws *WebSocket) onReconnect(attempt int, delay time.Duration) {
 }
 
 func (ws *WebSocket) onConnected() {
-
-	if ws.reconnectAttempt > 0 {
-		err := ws.resubscribe()
-		if err != nil {
-			return
-		}
-		ws.reconnectAttempt = 0
-	} else {
-		if ws.callbacks.onConnected != nil {
-			ws.callbacks.onConnected()
-		}
+	if ws.callbacks.onConnected != nil {
+		ws.callbacks.onConnected()
 	}
 }
 
