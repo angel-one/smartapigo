@@ -1,6 +1,8 @@
 package smartapigo
 
-import "net/http"
+import (
+	"net/http"
+)
 
 // LTPResponse represents LTP API Response.
 type LTPResponse struct {

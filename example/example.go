@@ -13,7 +13,7 @@ func main() {
 	fmt.Println("Client :- ", ABClient)
 
 	// User Login and Generate User Session
-	session, err := ABClient.GenerateSession("your totp here")
+	session, err := ABClient.GenerateSession()
 
 	if err != nil {
 		fmt.Println(err.Error())
