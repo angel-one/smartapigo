@@ -30,6 +30,7 @@ const (
 	URILTP              string = "rest/secure/angelbroking/order/v1/getLtpData"
 	URIRMS              string = "rest/secure/angelbroking/user/v1/getRMS"
 	URIConvertPosition  string = "rest/secure/angelbroking/order/v1/convertPosition"
+	URILTPQuote         string = "/rest/secure/angelbroking/market/v1/quote"
 )
 
 func structToMap(obj interface{}, tagName string) map[string]interface{} {

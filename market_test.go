@@ -21,3 +21,20 @@ func (ts *TestSuite) TestGetLTP(t *testing.T) {
 	}
 
 }
+
+func (ts *TestSuite) TestLTPForTokens(t *testing.T) {
+	t.Parallel()
+	params := LTPForTokens{
+		Mode: "LTP",
+	}
+	params.ExchangeTokens.Nse = []string{"3045", "2885"}
+	ltp, err := ts.TestConnect.GetLTPForTokens(params)
+	if err != nil {
+		t.Errorf("Error while fetching LTP. %v", err)
+	}
+
+	if ltp.Status == false {
+		t.Errorf("Error while exchange in LTP for tokens. %v", err)
+	}
+
+}
